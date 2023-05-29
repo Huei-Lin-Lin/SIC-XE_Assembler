@@ -15,8 +15,9 @@ def printDataList(assembler):
     for k in assembler.dataDict.keys():
         data = assembler.dataDict[k]
         if type(data.location) == int and type(data.objectCode) == int:
-            print("{:4}  {:>8}  {:>6}  {:>6}  {:>14}  {:>11}".format(
-            data.lineNum, ('%04X' % data.location), data.symbol, data.mnemonic, data.operand, ('%06X' % data.objectCode)))
+            size = data.format * 2 
+            print("{:4}  {:>8}  {:>6}  {:>6}  {:>14}  {:<11}".format(
+            data.lineNum, ('%04X' % data.location), data.symbol, data.mnemonic, data.operand, ('%X' % data.objectCode).zfill(size)))
         elif type(data.location) == int and type(data.objectCode) == str:
             print("{:4}  {:>8}  {:>6}  {:>6}  {:>14}  {:>11}".format(
             data.lineNum, ('%04X' % data.location), data.symbol, data.mnemonic, data.operand, data.objectCode))
@@ -35,8 +36,9 @@ def writeDataList(assembler, fileName):
         for k in assembler.dataDict.keys():
             data = assembler.dataDict[k]
             if type(data.location) == int and type(data.objectCode) == int:
-                f.write("{:4}  {:>8}  {:>6}  {:>6}  {:>14}  {:>11}\n".format(
-                data.lineNum, ('%04X' % data.location), data.symbol, data.mnemonic, data.operand, ('%06X' % data.objectCode)))
+                size = data.format * 2 
+                f.write("{:4}  {:>8}  {:>6}  {:>6}  {:>14}  {:<11}\n".format(
+                data.lineNum, ('%04X' % data.location), data.symbol, data.mnemonic, data.operand, ('%X' % data.objectCode).zfill(size)))
             elif type(data.location) == int and type(data.objectCode) == str:
                 f.write("{:4}  {:>8}  {:>6}  {:>6}  {:>14}  {:>11}\n".format(
                 data.lineNum, ('%04X' % data.location), data.symbol, data.mnemonic, data.operand, data.objectCode))

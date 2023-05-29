@@ -75,7 +75,7 @@ class Assembler:
           continue
         if self.checkDirective(dataList):  # 檢查是否有虛指令
           continue
-        if self.hasStart:
+        elif self.hasStart:
           if self.checkInstruction(dataList, opCodeDict):  # 檢查指令
             continue
           else:
@@ -351,27 +351,33 @@ class Assembler:
       return False
   
   def checkDirective(self, dataList) -> bool:
-    directiveList = {
-      "START" : self.startDirective,
-      "END"   : self.endDirective,
-      "BYTE"  : self.byteDirective,
-      "WORD"  : self.wordDirective,
-      "RESB"  : self.resbDirective,
-      "RESW"  : self.reswDirective,
-      "BASE"  : self.baseDirective,
-      # "NOBASE" : nobaseDirective,
-      # "LTORG" : ltorgDirective,
-      # "EQU" : equDirective,
-    }
+    directiveList = ["START", "END", "BYTE", "WORD", "RESB", "RESW", "BASE"]
     for data in dataList:
-      if data in directiveList.keys():
+      if data in directiveList:
         if data != "START" and self.hasStart == False:
           error("程式碼沒有 START", self)
           return False
         else:
-          directiveList[data](dataList) # 執行 directive 相對應的程式
+          # 執行 directive 相對應的程式
+          match data:
+            case "START":
+              self.startDirective(dataList)
+            case "END":
+              self.endDirective(dataList)
+            case "BYTE":
+              self.byteDirective(dataList)
+            case "WORD":
+              self.wordDirective(dataList)
+            case "RESB":
+              self.resbDirective(dataList)
+            case "RESW":
+              self.reswDirective(dataList)
+            case "BASE":
+              self.baseDirective(dataList)
+            case _:
+              return False
           return True
-    return False
+    
   
   def startDirective(self, dataList):
     if dataList[0] == "START":
@@ -533,11 +539,12 @@ class Assembler:
         symbolLocation = self.getSymbolLocation(dataList[1], False, True)
         if symbolLocation == 0:
           self.baseAddressingDict["symbol"] = dataList[1]
+          self.dataDict["BASE"] = Data(self.curLineNum, "", "", dataList[0], dataList[1], "", 0)
           return
         else:
           self.base = symbolLocation 
           self.dataDict["BASE"] = Data(self.curLineNum, "", "", dataList[0], dataList[1], "", 0)
       else:
-        error(f"{self.curLineNum} {self.curLine} BASE 輸入的格式有誤", self)
+        error("BASE 輸入的格式有誤", self)
 
   

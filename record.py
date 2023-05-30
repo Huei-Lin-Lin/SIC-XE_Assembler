@@ -61,7 +61,7 @@ def writeObjectProgram(assembler, fileName):
           f.write("{:1} {:06X}".format(recordList[i].type, recordList[i].returnAddress))
           break
         elif recordList[i].type == "T*":
-          f.write("{:1} {:06X} {:02X} {:X} ".format("*", recordList[i].location, recordList[i].length, recordList[i].objectCode))
+          f.write("{:1} {:06X} {:02X} {:X} ".format("T", recordList[i].location, recordList[i].length, recordList[i].objectCode))
         else:
           size = recordList[i].length * 2
           if i == 0:

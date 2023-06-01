@@ -10,15 +10,16 @@ def main():
   Mnemonic.getOpCodeDict(opCodeFile)
   
   # 讀檔案
-  inputFile = 'SICXE.txt'
+  inputFile = 'testData\SICXE.txt'  
   assembler = Assembler(inputFile)
   outputFile = "output.txt"
   try:
     assembler.execute(inputFile, Mnemonic.opCodeDict)
-    if hasError:
+    if assembler.hasError:
       raise CustomException
-    writeDataList(assembler, outputFile)  
-    writeObjectProgram(assembler, outputFile)  
+    else:
+      writeDataList(assembler, outputFile)  
+      writeObjectProgram(assembler, outputFile)  
   except CustomException:
     pass
 if __name__ == '__main__':

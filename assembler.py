@@ -2,6 +2,7 @@ from data import *
 from customException import *
 from record import *
 from mnemonic import *
+import os
 
 class Assembler:
   def __init__(self, inputFile) -> None:
@@ -21,20 +22,27 @@ class Assembler:
     self.startAddress = None
     self.endAddress = None
     self.baseAddressingDict = {"symbol": None, "forwardList" : []}
+    self.hasError = False
 
+  def error(self, msg, printLine=True):
+    self.hasError = True
+    if printLine:
+      print(f"\n在 {self.inputFile} 的第 {self.curLineNum} 行 {self.curLine} 發生錯誤\n錯誤原因：{msg}")
+    else:
+      print(f"\n{msg}")
   
   def strToHex(self, num, errMessage) -> int:
     try:
       return int(num, 16)
     except:
-      error(errMessage, self)
+      self.error(errMessage)
 
   
   def charToHex(self, char, errMessage) -> str:
     try:
       return hex(ord(char)).replace("0x", "")
     except:
-      error(errMessage, self)
+      self.error(errMessage)
 
   def checkRecordLength(self, format) -> bool:
     tempLength = format + self.curRecordLength
@@ -61,41 +69,52 @@ class Assembler:
     self.curRecordLength = 0
 
   def execute(self, filename, opCodeDict) -> None:
-    with open(filename, 'r') as file:
-      for lineNum, line in enumerate(file.readlines()):
-        self.curLineNum = lineNum + 1
-        self.curLine = line.replace("\n", "")
-        tempString = line
-        dataList = []
-        if '.' in line:  # 如果有註解，就只擷取 非註解字串
-          tempString = line[:line.index('.')]
-        dataList = tempString.split()
-        if(dataList == []):
-          # FIXME 將註解資料存起來
-          continue
-        if self.checkDirective(dataList):  # 檢查是否有虛指令
-          continue
-        elif self.hasStart:
-          if self.checkInstruction(dataList, opCodeDict):  # 檢查指令
-            continue
-          else:
-            error("mnemonic error", self)
-        else:
-          error("此程式碼沒有 START", self)
-    if self.hasEnd == False:
-      error("此程式碼沒有 END", self)
-    # 檢查未定義的 symbol 
-    for key in self.symbolTable.keys():
-      if type(self.symbolTable[key]) == dict and self.symbolTable[key]['location'] == "*":
-        error(f"{key} 此 symbol 未定義")
+    hasPrintedNoStart = False
+    if os.path.exists(filename):
+      fileType = filename[-4:]
+      if fileType != '.txt':
+        self.error(f"{filename} 不是純文字檔", False)
+      else:
+        with open(filename, 'r') as file:
+          for lineNum, line in enumerate(file.readlines()):
+            self.curLineNum = lineNum + 1
+            self.curLine = line.replace("\n", "")
+            tempString = line
+            dataList = []
+            if '.' in line:  # 如果有註解，就只擷取 非註解字串
+              tempString = line[:line.index('.')]
+            dataList = tempString.split()
+            if(dataList == []):
+              # FIXME 將註解資料存起來
+              continue
+            if self.checkDirective(dataList):  # 檢查是否有虛指令
+              continue
+            elif self.hasStart:
+              if self.checkInstruction(dataList, opCodeDict):  # 檢查指令
+                continue
+              else:
+                self.error("mnemonic error")
+            else:
+              if hasPrintedNoStart == False:
+                self.error("此程式碼沒有 START")
+                hasPrintedNoStart = True
+                raise CustomException
+        if self.hasEnd == False:
+          self.error("此程式碼沒有 END", False)
+        # 檢查未定義的 symbol 
+        for key in self.symbolTable.keys():
+          if type(self.symbolTable[key]) == dict and self.symbolTable[key]['location'] == "*":
+            self.error(f"{key} 此 symbol 未定義", False)
+    else:
+      self.error(f"{filename} 檔案不存在", False)
 
   # 檢查是否有重複的 symbol 或是跟 Mnemonic 撞名
   def storeSymbol(self, symbol, opCodeDict):
     if len(symbol) > 6:
-      error("symbol 長度最多是 6", self)
+      self.error("symbol 長度最多是 6")
     elif symbol in self.symbolTable.keys():
       if type(self.symbolTable[symbol]) == int:
-        error(f"{symbol} 重複定義 symbol", self)
+        self.error(f"{symbol} 重複定義 symbol")
       else:
         if self.symbolTable[symbol]["location"] == "*":
           self.symbolTable[symbol]["location"] = self.curLocation
@@ -127,17 +146,16 @@ class Assembler:
             self.reallocation(location+1, length, value)
           return 0
         else:
-          error(f"{symbol} 重複定義 symbol", self)
+          self.error(f"{symbol} 重複定義 symbol")
     elif symbol in opCodeDict.keys():
-      error(f"{symbol} 不可與 Mnemonic 撞名", self)
+      self.error(f"{symbol} 不可與 Mnemonic 撞名")
     elif symbol == "BASE":
-      error("不可與 BASE 撞名", self)
+      self.error("不可與 BASE 撞名")
     else:
       self.symbolTable[symbol] = self.curLocation
       return -1
     
   # 取得 symbol value
-  # , isBASE: bool
   def getSymbolLocation(self, symbol, isIndexAddressing:bool, isBASE=False) -> int:
     if symbol in self.symbolTable.keys():
       if type(self.symbolTable[symbol]) == int:
@@ -154,9 +172,9 @@ class Assembler:
           return self.symbolTable[symbol]["location"]
     else:
       if symbol in Mnemonic.opCodeDict.keys():
-        error(f"{symbol} 不可與 Mnemonic 撞名", self)
+        self.error(f"{symbol} 不可與 Mnemonic 撞名")
       elif symbol == "BASE":
-        error("不可與 BASE 撞名", self)
+        self.error("不可與 BASE 撞名")
       if isBASE == False:
         if isIndexAddressing:
           self.symbolTable[symbol] = {"forwardList": [[self.curLocation, "X"]], "location" : "*"}
@@ -177,7 +195,7 @@ class Assembler:
         if disp <= 4095 and 0 <= disp: 
           return {"type" : "BASE", "disp" : disp}
         else:
-          error(f"位移 {disp} 超過設定範圍 0 ~ 4095", self)
+          self.error(f"位移 {disp} 超過設定範圍 0 ~ 4095")
       else:
         if self.baseAddressingDict["forwardList"] == []:
           self.baseAddressingDict["forwardList"] = [self.curLocation]
@@ -200,11 +218,11 @@ class Assembler:
         operand = ''.join(dataList[i+1:])
         operandList = ''.join(dataList[i+1:]).split(',')
         if len(operandList) > 2:
-          error("太多 operand", self)
+          self.error("太多 operand")
         elif len(opCodeDict[mnemonic].format) == 1:
           if opCodeDict[mnemonic].format[0] == "1":  # Format 1
             if len(operandList) != 0:
-              error("Format 1 Instruction 不用寫 operand", self)
+              self.error("Format 1 Instruction 不用寫 operand")
             else:
               format = 1
               self.PC += format
@@ -214,7 +232,7 @@ class Assembler:
             objectCode = opCodeDict[mnemonic].opCode
             for i in range(len(operandList)):
               if operandList[i] not in registerList:
-                error("Format 2 的 operand 不是 register name", self)
+                self.error("Format 2 的 operand 不是 register name")
               else:
                 symbolLocation = self.getSymbolLocation(operandList[i], False)
                 objectCode += str(symbolLocation) 
@@ -225,7 +243,7 @@ class Assembler:
             objectCode = int(objectCode, 16)
             break
           else:
-            error(f"沒有 Format {opCodeDict[mnemonic].format[0]}", self)
+            self.error(f"沒有 Format {opCodeDict[mnemonic].format[0]}")
         else:  # Format 3
           objectCode = int(opCodeDict[mnemonic].opCode, 16) * int('10000', 16)  # 目前是 int
           format = 3
@@ -235,7 +253,7 @@ class Assembler:
             self.PC += format
           if mnemonic == "RSUB":  # 檢查 RSUB
             if i < len(dataList) - 1:
-              error("RSUB 不用有 operand", self)
+              self.error("RSUB 不用有 operand")
             nixbpe = 0b110000
             objectCode += nixbpe * int('1000', 16)
             break
@@ -254,13 +272,13 @@ class Assembler:
               objectCode += nixbpe * int('1000', 16) + displacement["disp"]
               break
             else:  # 檢查 operandList[1] 是不是 X
-              error("index addressing 的 operand2 要是 X", self)
+              self.error("index addressing 的 operand2 要是 X")
           else:  # len(operandList) == 1
             if "@" in operandList[0]:  # "@" indirect addressing
               if operandList[0][0] == "@":
                 tempOperand = operandList[0][1:]
                 if tempOperand.isdigit():
-                  error("@ 後要接 symbol", self)
+                  self.error("@ 後要接 symbol")
                 else:
                   symbolLocation = self.getSymbolLocation(tempOperand, False)
                   if symbolLocation == 0:
@@ -275,7 +293,7 @@ class Assembler:
                   objectCode += nixbpe * int('1000', 16) + displacement["disp"]
                 break
               else:
-                error("格式錯誤，'@' 要在 operand 最前面", self)
+                self.error("格式錯誤，'@' 要在 operand 最前面")
             elif "#" in operandList[0]:  # "#" immediate addressing
               if operandList[0][0] == "#":
                 tempOperand = operandList[0][1:] 
@@ -296,7 +314,7 @@ class Assembler:
                   objectCode += nixbpe * int('1000', 16) + displacement["disp"]
                 break
               else:
-                error("格式錯誤，'#' 要在 operand 最前面", self)
+                self.error("格式錯誤，'#' 要在 operand 最前面")
             else: # relative addressing
               tempOperand = operandList[0]
               symbolLocation = self.getSymbolLocation(tempOperand, False)
@@ -327,6 +345,7 @@ class Assembler:
             tempOperand = operandList[0][1:]
             nixbpe = 0b010001
             objectCode += nixbpe * int('100000', 16) + int(tempOperand)
+            break
           else:  # "#" 接的是 symbol
             nixbpe = 0b110001
             symbolLocation = self.getSymbolLocation(tempOperand, False)
@@ -337,10 +356,13 @@ class Assembler:
               objectCode += symbolLocation
               break
         else:
-          error("只能有一個 operand", self) # FIXME
+          self.error("只能有一個 operand") # FIXME
       else: 
-        symbol = dataList[i]
-        self.storeSymbol(dataList[i], opCodeDict)  # 存入 self.symbolTable
+        if i == 0:
+          symbol = dataList[i]
+          self.storeSymbol(dataList[i], opCodeDict)  # 存入 self.symbolTable
+        else:
+          return False
     if hasMnemonic:
       self.dataDict[self.curLocation] = Data(self.curLineNum, self.curLocation, symbol, mnemonic, operand, objectCode, format)
       self.checkRecordLength(format)
@@ -355,11 +377,9 @@ class Assembler:
     for data in dataList:
       if data in directiveList:
         if data != "START" and self.hasStart == False:
-          error("程式碼沒有 START", self)
           return False
         else:
-          # 執行 directive 相對應的程式
-          match data:
+          match data:  # 執行 directive 相對應的程式
             case "START":
               self.startDirective(dataList)
             case "END":
@@ -381,14 +401,16 @@ class Assembler:
   
   def startDirective(self, dataList):
     if dataList[0] == "START":
-      error("沒有 Program Name\n", self)
+      self.error("沒有 Program Name\n")
     elif dataList[-1] == "START":
-      error("沒有 Starting Addressing\n", self)
+      self.error("沒有 Starting Addressing\n")
     elif len(dataList) != 3 and dataList[1] != "START":
-      error("此行格式有誤", self)
+      self.error("此行格式有誤")
     else:
       self.hasStart = True
       value = self.strToHex(dataList[2], "Starting Addressing 不是 16 進位")
+      if value == None:
+        raise CustomException
       self.startAddress = value
       self.curLocation = value
       self.dataDict["START"] = Data(self.curLineNum, "", dataList[0], dataList[1], dataList[2], "", 0)
@@ -400,10 +422,10 @@ class Assembler:
 
   def endDirective(self, dataList):
     if dataList[0] != "END" or len(dataList) != 2:
-      error("END 格式錯誤", self)
+      self.error("END 格式錯誤")
     else:
+      self.hasEnd = True
       if dataList[1] in self.symbolTable.keys():
-        self.hasEnd = True
         self.endAddress = self.curLocation
         symbolLocation = self.getSymbolLocation(dataList[1], False)
         self.curLocation = symbolLocation  # 改 self.curLocation 
@@ -412,15 +434,15 @@ class Assembler:
         self.recordDict[self.recordLineNum] = [End("E", self.curLocation)]
         self.curRecordLength = 0
       else:
-        error(f"{dataList[-1]} not in symbol table", self)
+        self.error(f"{dataList[-1]} not in symbol table")
 
   def byteDirective(self, dataList):
     if dataList[0] == "BYTE":
-      error("沒有定義 BYTE 的 symbol", self)
+      self.error("沒有定義 BYTE 的 symbol")
     elif len(dataList) < 3:
-      error("沒有輸入 BYTE 的值", self)
+      self.error("沒有輸入 BYTE 的值")
     elif dataList[1] != "BYTE":
-      error("BYTE 格式有誤", self)
+      self.error("BYTE 格式有誤")
     else:
       objectCode = None
       size = 0
@@ -429,16 +451,16 @@ class Assembler:
           tempValue = dataList[2][2:-1]
           objectCode = self.strToHex(tempValue, "BYTE X 後要接 16 進位的數字")
           if objectCode > int('100', 16):
-            error("超過 1 BYTE", self)
+            self.error("超過 1 BYTE")
           size = 1
           self.PC += size 
         else:
-          error("X 後沒有 ' 將數字包起來", self)
+          self.error("X 後沒有 ' 將數字包起來")
       elif dataList[2][0] == "C":
         if dataList[2][1] == "'" and dataList[2][-1] == "'":
           tempChar = dataList[2][2:-1]
           if len(tempChar) > 3:
-            error("超過 3 BYTE", self, self)
+            self.error("超過 3 BYTE")
           charList = []
           for char in tempChar:
             charList.append(self.charToHex(char, f"{self.curLine} 輸入有誤"))
@@ -446,9 +468,9 @@ class Assembler:
           size = len(tempChar)
           self.PC += size 
         else:
-          error("C 後沒有 ' 將字母包起來", self)
+          self.error("C 後沒有 ' 將字母包起來")
       else:
-        error("BYTE 輸入的格式有誤，開頭要是 C 或 X", self)
+        self.error("BYTE 輸入的格式有誤，開頭要是 C 或 X")
       self.storeSymbol(dataList[0], Mnemonic.opCodeDict)  
       self.dataDict[self.curLocation] = Data(self.curLineNum, self.curLocation, dataList[0], dataList[1], dataList[2], objectCode, size)
       self.checkRecordLength(size)
@@ -457,16 +479,16 @@ class Assembler:
   
   def wordDirective(self, dataList):
     if dataList[0] == "WORD":
-      error("沒有定義 WORD 的 symbol", self)
+      self.error("沒有定義 WORD 的 symbol")
     elif len(dataList) < 3 :
-      error("沒有輸入 WORD 的值", self)
+      self.error("沒有輸入 WORD 的值")
     elif dataList[1] != "WORD":
-      error("WORD 格式有誤", self)
+      self.error("WORD 格式有誤")
     else:
       if dataList[2].isdigit():
         value = int(dataList[2])
         if value > int('1000000', 16):
-          error("輸入的值超過 3 BYTE", self)
+          self.error("輸入的值超過 3 BYTE")
         objectCode = value
         size = 3
         self.PC += size 
@@ -476,23 +498,23 @@ class Assembler:
         self.saveTextRecord(size, objectCode)
         self.curLocation = self.PC  # 改 self.curLocation
       else:
-        error("WORD 輸入的格式有誤，必須輸入 10 進位的值", self)
+        self.error("WORD 輸入的格式有誤，必須輸入 10 進位的值")
     
 
   def resbDirective(self, dataList):
     if dataList[0] == "RESB":
-      error("沒有定義 RESB 的 symbol", self)
+      self.error("沒有定義 RESB 的 symbol")
     elif len(dataList) < 3:
-      error("沒有輸入 RESB 的值", self)
+      self.error("沒有輸入 RESB 的值")
     elif dataList[1] != "RESB":
-      error("RESB 格式有誤", self)
+      self.error("RESB 格式有誤")
     else:
       if dataList[2].isdigit():
         size = int(dataList[2])
         if size > int('1000000', 16):
-          error("輸入的值過大，超過 3 BYTE", self)
+          self.error("輸入的值過大，超過 3 BYTE")
         elif (self.curLocation + size) > int('1000000', 16):
-          error("Instruction 空間不足", self)
+          self.error("Instruction 空間不足")
         objectCode = ""
         self.PC += size  
         self.storeSymbol(dataList[0], Mnemonic.opCodeDict)  
@@ -501,22 +523,22 @@ class Assembler:
         self.curRecordLength = 0
         self.curLocation = self.PC  # 改 self.curLocation
       else:
-        error("RESB 輸入的格式有誤，必須輸入 10 進位的值", self)
+        self.error("RESB 輸入的格式有誤，必須輸入 10 進位的值")
 
   def reswDirective(self, dataList):
     if dataList[0] == "RESW":
-      error("沒有定義 RESW 的 symbol", self)
+      self.error("沒有定義 RESW 的 symbol")
     elif len(dataList) < 3:
-      error("沒有輸入 RESW 的值", self)
+      self.error("沒有輸入 RESW 的值")
     elif dataList[1] != "RESW":
-      error("RESW 格式有誤", self)
+      self.error("RESW 格式有誤")
     else:
       if dataList[2].isdigit():
         size = int(dataList[2]) * 3
         if size > int('1000000', 16):
-          error("輸入的值過大，超過 3 BYTE", self)
+          self.error("輸入的值過大，超過 3 BYTE")
         elif (self.curLocation + size) > int('1000000', 16):
-          error("Instruction 空間不足", self)
+          self.error("Instruction 空間不足")
         objectCode = ""
         self.PC += size  # 改 self.PC
         self.storeSymbol(dataList[0], Mnemonic.opCodeDict)  
@@ -525,15 +547,15 @@ class Assembler:
         self.curRecordLength = 0
         self.curLocation = self.PC  # 改 self.curLocation
       else:
-        error("RESW 輸入的格式有誤，必須輸入 10 進位的值", self)
+        self.error("RESW 輸入的格式有誤，必須輸入 10 進位的值")
 
   def baseDirective(self, dataList):
     if dataList[0] != "BASE":
-      error("不用定義 BASE 的 symbol", self)
+      self.error("不用定義 BASE 的 symbol")
     elif len(dataList) != 2:
-      error("BASE 輸入的格式有誤", self)
+      self.error("BASE 輸入的格式有誤")
     elif self.base != None:
-      error("BASE 重複定義", self)
+      self.error("BASE 重複定義")
     else:
       if dataList[1] in self.symbolTable.keys():
         symbolLocation = self.getSymbolLocation(dataList[1], False, True)
@@ -545,6 +567,6 @@ class Assembler:
           self.base = symbolLocation 
           self.dataDict["BASE"] = Data(self.curLineNum, "", "", dataList[0], dataList[1], "", 0)
       else:
-        error("BASE 輸入的格式有誤", self)
+        self.error("BASE 輸入的格式有誤")
 
   

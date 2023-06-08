@@ -1,7 +1,9 @@
-from assembler import *
-from customException import *
-from mnemonic import *
-from token import *
+from my_utils.assembler import Assembler
+from my_utils.customException import CustomException
+from my_utils.mnemonic import Mnemonic
+from my_utils.data import writeDataList
+from my_utils.record import writeObjectProgram
+import os
 
 def checkFile(file) -> bool:
   if os.path.exists(file):

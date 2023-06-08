@@ -1,7 +1,7 @@
-from data import *
-from customException import *
-from record import *
-from mnemonic import *
+from my_utils.data import Data
+from my_utils.customException import CustomException
+from my_utils.record import Text, Head, End, Modification
+from my_utils.mnemonic import Mnemonic
 import os
 
 class Assembler:

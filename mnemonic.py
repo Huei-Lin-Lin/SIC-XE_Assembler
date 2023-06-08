@@ -1,5 +1,5 @@
 class Mnemonic(object):
-  opCodeDict = dict() # 建立一個名稱為 opCodeDict 字典
+  opCodeDict = dict() 
 
   def __init__(self, mnemonic, format, opCode) -> None:
     self.mnemonic = mnemonic

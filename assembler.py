@@ -64,7 +64,7 @@ class Assembler:
       self.recordDict[self.recordLineNum] = [Text("T", self.curLocation, length, objectCode)]
 
   # 回填位址
-  def reallocation(self, location, length, value):
+  def updateRecord(self, location, length, value):
     self.recordLineNum += 1
     # 要回填的位址  要回填甚麼
     self.recordDict[self.recordLineNum] = [Text("T*", location, length, value)]
@@ -96,7 +96,11 @@ class Assembler:
     # 檢查未定義的 symbol 
     for key in self.symbolTable.keys():
       if type(self.symbolTable[key]) == dict and self.symbolTable[key]['location'] == "*":
-        self.error(f"{key} 此 symbol 未定義", False)
+        for location in self.symbolTable[key]["forwardList"]:
+          if type(location) == list:
+            self.error(f"第 {self.dataDict[location[0]].lineNum} 行的 {key} label 未定義", False)
+          else:
+            self.error(f"第 {self.dataDict[location].lineNum} 行的 {key} label 未定義", False)
 
   # 檢查是否有重複的 symbol 或是跟 Mnemonic 撞名
   def storeSymbol(self, symbol):
@@ -138,7 +142,7 @@ class Assembler:
             value = xbpe * int('1000', 16) + displacement["disp"]
           self.dataDict[location].objectCode += value
           length = int(len(hex(value).replace("0x", ""))/2)
-          self.reallocation(location+1, length, value)
+          self.updateRecord(location+1, length, value)
 
     
   # 取得 symbol value
@@ -200,9 +204,13 @@ class Assembler:
     hasMnemonic = False
     for i in range(len(dataList)):
       if dataList[i] in Mnemonic.opCodeDict.keys(): # 如果是 opCode
-        mnemonic = dataList[i] 
+        mnemonic = dataList[i]
         hasMnemonic = True
         if len(dataList[i+1:]) > 1:
+          for operand in dataList[i+1:]:
+            if operand in Mnemonic.opCodeDict.keys():
+              self.error(f"Mnemonic 不能當 operand")
+              return False
           if ',' not in  dataList[i+1] and ',' not in dataList[i+2]:
             self.error("沒有用 , 隔開 operand")
             return False
@@ -221,6 +229,10 @@ class Assembler:
               objectCode = int(Mnemonic.opCodeDict[mnemonic].opCode, 16)  # 計算 object Code
               break  
           elif Mnemonic.opCodeDict[mnemonic].format[0] == "2":  # Format 2
+            if mnemonic == "COMPR": 
+              if len(operandList) != 2:
+                self.error("COMPR 要有兩個 operand")
+                return False
             objectCode = Mnemonic.opCodeDict[mnemonic].opCode
             for i in range(len(operandList)):
               if operandList[i] not in registerList:
@@ -550,7 +562,7 @@ class Assembler:
         self.saveTextRecord(30,  int(tempValue[:60], 16))
         self.recordLineNum += 1
         self.curRecordLength = size-30
-        self.recordDict[self.recordLineNum] = [Text("T", self.curLocation + 30, size - 30, int(tempValue[60:], 16))]
+        self.recordDict[self.recordLineNum] = [Text("T", self.curLocation + int('30', 16) , size - 30, int(tempValue[60:], 16))]
       else:
         self.saveTextRecord(size, objectCode)
       self.curLocation = self.PC  # 改 self.curLocation

@@ -5,7 +5,6 @@ class Data(object):
         self.symbol = symbol
         self.mnemonic = mnemonic
         self.operand = operand
-        # FIXME: 檢查 objectCode 只能是 "" 或是 int(10 進位)
         self.objectCode = objectCode
         self.format = format
 

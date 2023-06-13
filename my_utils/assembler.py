@@ -548,16 +548,16 @@ class Assembler:
             return
           else:
             size = len(tempChar)
-            if size > 60:
-              self.error("超過 60 BYTE")
-              return
-            else:
-              charList = []
-              for char in tempChar:
-                charList.append(self.charToHex(char, f"{self.curLine} 輸入有誤"))
-              tempValue = ''.join(charList)
-              objectCode = int(tempValue, 16) 
-              self.PC += size 
+            # if size > 60:
+            #   self.error("超過 60 BYTE")
+            #   return
+            # else:
+            charList = []
+            for char in tempChar:
+              charList.append(self.charToHex(char, f"{self.curLine} 輸入有誤"))
+            tempValue = ''.join(charList)
+            objectCode = int(tempValue, 16) 
+            self.PC += size 
         else:
           self.error(f"{dataList[2]} 沒有用 '' 將數字包起來")
           return
@@ -567,11 +567,19 @@ class Assembler:
       self.storeSymbol(dataList[0])  
       self.dataDict[self.curLocation] = Data(self.curLineNum, self.curLocation, dataList[0], dataList[1], dataList[2], objectCode, size)
       self.checkRecordLength(size)
-      if size > 30 and size <= 60:
-        self.saveTextRecord(30,  int(tempValue[:60], 16))
-        self.recordLineNum += 1
-        self.curRecordLength = size-30
-        self.recordDict[self.recordLineNum] = [Text("T", self.curLocation + int('30', 16) , size - 30, int(tempValue[60:], 16))]
+      if size > 30:
+        lines = size // 30
+        if size % 30 != 0:
+          lines += 1
+        for i in range(lines):
+          if i == lines -1:
+            self.recordDict[self.recordLineNum] = [Text("T", self.curLocation + (i * int('1E', 16)), (size % 30), int(tempValue[30*2*i : size * 2], 16))]
+            self.recordLineNum += 1
+            self.curRecordLength = (size % 30)
+          else:
+            self.recordDict[self.recordLineNum] = [Text("T", self.curLocation + (i * int('1E', 16)), 30, int(tempValue[30*2*i : 30*2*(i+1)], 16))]
+            self.recordLineNum += 1
+            self.curRecordLength = 30
       else:
         self.saveTextRecord(size, objectCode)
       self.curLocation = self.PC  # 改 self.curLocation

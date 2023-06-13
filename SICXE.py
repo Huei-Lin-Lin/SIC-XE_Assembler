@@ -5,13 +5,13 @@ from my_utils.data import writeDataList
 from my_utils.record import writeObjectProgram
 import os
 
-def checkFile(file) -> bool:
+def checkFile(file, fType) -> bool:
   if os.path.exists(file):
     fileType = file[-4:]
-    if fileType == '.txt':
+    if fileType == fType:
       return True
     else:
-      print(f"{file} 不是純文字檔")
+      print(f"{file} 發生錯誤，輸入檔案類型應為 {fType}")
       return False
   else:
     print(f"{file} 檔案不存在")
@@ -20,11 +20,11 @@ def checkFile(file) -> bool:
 def main():
   # 讀檔案
   opCodeFile = 'opCode.txt'
-  inputFile = 'testData\SICXE.txt'  
+  inputFile = 'testData\SICXE.asm'  
   assembler = Assembler(inputFile)
-  outputFile = "output.txt"
+  outputFile = "108213034_林惠霖_output.txt"
   try:
-    if checkFile(opCodeFile) and checkFile(inputFile):
+    if checkFile(opCodeFile, '.txt') and checkFile(inputFile, '.asm'):
       Mnemonic.getOpCodeDict(opCodeFile)
       assembler.execute(inputFile)
       if assembler.hasError:

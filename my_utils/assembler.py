@@ -215,6 +215,14 @@ class Assembler:
             self.error("沒有用 , 隔開 operand")
             return False
         operandList = ''.join(dataList[i+1:]).split(',')
+        if operandList == ['']:
+          operandList = []
+        if len(operandList) != int(Mnemonic.opCodeDict[mnemonic].operandNum):
+          if len(operandList) == 2 and operandList[1] == "X":
+            pass
+          else:
+            self.error(f"{mnemonic} 要有 {Mnemonic.opCodeDict[mnemonic].operandNum} 個 operand")
+            return False
         if len(operandList) > 2:
           self.error("太多 operand")
           return False
@@ -229,10 +237,6 @@ class Assembler:
               objectCode = int(Mnemonic.opCodeDict[mnemonic].opCode, 16)  # 計算 object Code
               break  
           elif Mnemonic.opCodeDict[mnemonic].format[0] == "2":  # Format 2
-            if mnemonic == "COMPR": 
-              if len(operandList) != 2:
-                self.error("COMPR 要有兩個 operand")
-                return False
             objectCode = Mnemonic.opCodeDict[mnemonic].opCode
             for i in range(len(operandList)):
               if operandList[i] not in registerList:
@@ -258,10 +262,7 @@ class Assembler:
             self.PC = self.curLocation + format
           else:
             self.PC += format
-          if mnemonic == "RSUB":  # 檢查 RSUB
-            if i < len(dataList) - 1:
-              self.error("RSUB 不用有 operand")
-              return False
+          if Mnemonic.opCodeDict[mnemonic].operandNum == "0":
             nixbpe = 0b110000
             objectCode += nixbpe * int('1000', 16)
             break
@@ -351,10 +352,18 @@ class Assembler:
         if dataList[i][1:] in Mnemonic.opCodeDict.keys():
           format = 4
           self.PC += format
-          mnemonic = dataList[i]
+          mnemonic = dataList[i][1:]
           operandList = ''.join(dataList[i+1:]).split(',')
+          if operandList == ['']:
+            operandList = []
+          if len(operandList) != int(Mnemonic.opCodeDict[mnemonic].operandNum):
+            if len(operandList) == 2 and operandList[1] == "X":
+              pass
+            else:
+              self.error(f"{mnemonic} 要有 {Mnemonic.opCodeDict[mnemonic].operandNum} 個 operand")
+              return False
           if len (operandList) == 1:
-            opCode = mnemonic[1:]
+            opCode = mnemonic
             hasMnemonic = True
             objectCode = int(Mnemonic.opCodeDict[opCode].opCode, 16) * int('1000000', 16)
             nixbpe = 0b0

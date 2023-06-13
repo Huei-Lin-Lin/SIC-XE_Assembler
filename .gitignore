@@ -1,5 +1,5 @@
 test.py
-output.txt
+*output.txt
 __pycache__/
 ancer.txt
 checkAncer.py

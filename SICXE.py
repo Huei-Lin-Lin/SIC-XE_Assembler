@@ -22,7 +22,7 @@ def main():
   opCodeFile = 'opCode.txt'
   inputFile = 'testData\SICXE.asm'  
   assembler = Assembler(inputFile)
-  outputFile = "108213034_林惠霖_output.txt"
+  outputFile = "output.txt"
   try:
     if checkFile(opCodeFile, '.txt') and checkFile(inputFile, '.asm'):
       Mnemonic.getOpCodeDict(opCodeFile)
